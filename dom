@@ -1,0 +1,43 @@
+(define (domain myDomain)
+  (:requirements :strips :typing :fluents)
+  (:types integer Thing)
+  
+  (:predicates
+    (power ?thing - Thing) ; Annotated property indicated by @id of type boolean
+    (powerRead ?thing - Thing) ; read Property indicator for readProperties
+  )
+
+   (:functions
+    (brightness ?thing - Thing) ; predicate (input in property) that is not boolean instead integer or number
+    (invokeActionIncreaseBrightnessInput ?v1 - integer ?thing - Thing)
+    (writePropertyBrightnessInput ?v2 - integer ?thing - Thing) 
+  )
+  
+  (:action readProperty_powerState ; for each readProperty add an action that is invoked if a property must be read -> effect is always name_read -R > preconditon is from TD
+    :parameters (?thing - Thing)
+    :precondition ()
+    :effect (powerRead ?thing)
+  )
+
+  (:action writeProperty_brightness ; for each writeProperty add an action that has as parameters the device and the input value -> effect is always input value assigned to propertyID 
+    :parameters (?v2 - integer ?thing - Thing)
+    :precondition (power ?thing)
+    :effect (assign (brightness ?thing)(writePropertyBrightnessInput ?v2 ?thing))
+  )
+
+  (:action invokeAction_turnOn
+    :parameters (?thing - Thing)
+    :precondition (not(power ?thing))
+    :effect (power ?thing)
+  )
+  (:action invokeAction_turnOff
+    :parameters (?thing - Thing)
+    :precondition (power ?thing)
+    :effect (not (power ?thing))
+  )
+  (:action invokeAction_increaseBrightness
+    :parameters (?v1 - integer ?thing - Thing)
+    :precondition (power ?thing)
+    :effect (assign (brightness ?thing)(+ (brightness ?thing)  (invokeActionIncreaseBrightnessInput ?v1 ?thing)))
+  )
+)

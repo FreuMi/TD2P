@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@node-wot/binding-http": "^0.8.12",
+    "@node-wot/core": "^0.8.12",
+    "express.js": "^1.0.0"
+  }
+}
