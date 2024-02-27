@@ -1,0 +1,22 @@
+(define (problem myProblem)
+  (:domain myDomain)
+
+    (:objects
+    lamp1 - Thing
+    input5 - integer 
+    input13 - integer 
+    )
+
+  (:init
+    (not (powerState lamp1))
+    (not (powerState_Read lamp1))
+    (= (brightnessState lamp1) 0)
+
+    (= (increaseBrightnessInput lamp1 input5) 1)
+    (= (brightnessState_input lamp1 input13) 50)
+  )
+
+  (:goal
+    (= (brightnessState lamp1) 50)
+  )
+)

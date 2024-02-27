@@ -168,7 +168,7 @@ function evalCondition(statement) {
   }
 }
 
-function generateActions(td, functions) {
+function generateActions(td) {
   ///////////////////////////////////////////////
   // Generate PDDL actions for readProperties //
   //////////////////////////////////////////////
@@ -210,14 +210,14 @@ function generateActions(td, functions) {
     if (td.properties[property].type == "integer") {
       const id = td.properties[property]["@id"];
       // Parameters are input value + Thing
-      const values = getData(`${id}`)[0];
+      const values = getData(`${id}_input`)[0];
       let parameters = "";
       for (let i = 0; i < values.types.length; i++) {
         parameters += ` ${values.variables[i]} - ${values.types[i]}`;
       }
       const preCondition = evalCondition(td.properties[property].preCondition);
       // Effect for write properties is always an value assignment of the input to the property
-      let effect = `assign (${id} ?thing)(${id}`;
+      let effect = `assign (${id} ?thing)(${id}_input`;
       for (const element of values.variables) {
         // Add variables
         effect += ` ${element}`;
@@ -519,7 +519,7 @@ function createDomainTemplate(domainName) {
   const addedFunctions = [];
   let functionString = "(:functions\n";
   for (const functionName of availableFunctions) {
-    functionString += "(";
+    functionString += `(${functionName.name}`;
 
     for (let i = 0; i < functionName.types.length; i++) {
       if (
@@ -527,7 +527,7 @@ function createDomainTemplate(domainName) {
           `${functionName.name}${functionName.variables[i]}`
         )
       ) {
-        functionString += ` ${functionName.name} ${functionName.variables[i]} - ${functionName.types[i]}`;
+        functionString += ` ${functionName.variables[i]} - ${functionName.types[i]}`;
 
         addedFunctions.push(`${functionName.name}${functionName.variables[i]}`);
       }
@@ -563,25 +563,146 @@ function generateDomain(td, domainName) {
 
   const domain = createDomainTemplate(domainName);
   console.log(domain);
+  return domain;
 }
 
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+
+const availableObjects = [];
+const availableInitialValues = [];
+
+function generateObjects(td) {
+  // One object representing the Thing
+  availableObjects.push({ name: td.title, type: "Thing", functionName: "" });
+
+  // Generate an object for inputs
+  let cnt = 0;
+  for (const element of availableFunctions) {
+    // Generate Name
+    const name = `input${cnt++}`;
+    // Generate type:
+    let type;
+    for (const elementType of element.types) {
+      if (elementType == "Thing") {
+        continue;
+      }
+      type = elementType;
+    }
+
+    // Check if type is undefined, if so no input
+    if (type == undefined) {
+      cnt--;
+      continue;
+    }
+
+    availableObjects.push({
+      name: name,
+      type: type,
+      functionName: element.name,
+    });
+  }
+}
+
+async function initValues(thing, initialValues, td) {
+  // Get current values of all read properties
+  for (const propertyName in td.properties) {
+    if (td.properties[propertyName].writeOnly == true) {
+      continue;
+    }
+
+    const response = await thing.readProperty(propertyName);
+    const value = await response.value();
+
+    availableInitialValues.push({
+      name: td.properties[propertyName]["@id"],
+      value: value,
+      thing: td.title,
+    });
+  }
+
+  // For all predicates with suffix _Read: Add init value false
+  for (const element of availablePredicates) {
+    if (element.name.endsWith("_Read")) {
+      availableInitialValues.push({
+        name: element.name,
+        value: false,
+        thing: td.title,
+      });
+    }
+  }
+
+  // Analyze initialValues
+  const keys = Object.keys(initialValues);
+  for (const key of keys) {
+    availableInitialValues.push({
+      name: key,
+      value: initialValues[key],
+      thing: td.title,
+    });
+  }
+}
+
+async function generateProblem(
+  td,
+  domainName,
+  problemName,
+  goal,
+  thing,
+  initialValues
+) {
+  let template = `
+    (define (domain ${problemName})
+    (:domain ${domainName})
+    <!--objects-->
+    <!--init-->
+    (:goal
+      ${goal}
+    )
+    )
+    `;
+
+  // Generate Objects
+  generateObjects(td);
+  console.log(availableObjects);
+
+  await initValues(thing, initialValues, td);
+  console.log(availableInitialValues);
+}
+
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////
 async function main() {
   const servient = new Servient();
   servient.addClientFactory(new HttpClientFactory(null));
 
   servient
     .start()
-
     .then(async (WoT) => {
-      // Get Thing Desccription
-      const td = await WoT.requestThingDescription(
-        "http://172.17.187.244:3001/"
-      );
-
+      // Init
+      const tdAddr = "http://172.23.220.91:3001/";
       const domainName = "myDomain";
-      const pddlDomain = generateDomain(td, domainName);
+      const problemName = "myProblem";
+      const goal = "(= (brighnessState SmartLightBulb) 15)";
+      const initialValues = { brightnessState: 0 };
 
-      let thing = await WoT.consume(td);
+      // Get Thing Desccription
+      const td = await WoT.requestThingDescription(tdAddr);
+      const thing = await WoT.consume(td);
+
+      const pddlDomain = generateDomain(td, domainName);
+      const pddlProblem = await generateProblem(
+        td,
+        domainName,
+        problemName,
+        goal,
+        thing,
+        initialValues
+      );
     })
     .catch((err) => {
       console.error(err);

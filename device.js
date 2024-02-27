@@ -13,7 +13,7 @@ let powerState = false;
 let brightness = 0;
 
 app.get("/", (req, res) => {
-  const IP = "172.17.187.244:3001";
+  const IP = "172.23.220.91:3001";
 
   const td = {
     "@context": [
@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
         type: "boolean",
         readOnly: true,
         writeOnly: false,
-        forms: [{ href: `http://${IP}/power` }],
+        forms: [{ href: `http://${IP}/status` }],
       },
       brightness: {
         "@id": "brightnessState",
@@ -43,7 +43,7 @@ app.get("/", (req, res) => {
         readOnly: false,
         minimum: 0,
         maximum: 255,
-        forms: [{ href: `http://${IP}/status` }],
+        forms: [{ href: `http://${IP}/brightness` }],
         preCondition: {
           "op:booleanEqual": [{ "@id": `powerState` }, true],
         },
