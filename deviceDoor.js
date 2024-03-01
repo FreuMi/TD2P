@@ -151,6 +151,7 @@ app.get("/powerSupplyTd", (req, res) => {
 
 app.get("/outputVoltage", function (req, res) {
   console.log("Read /outputVoltage state of power supply");
+  res.setHeader("content-type", "application/json");
   res.send(outputVoltage.toString());
 });
 

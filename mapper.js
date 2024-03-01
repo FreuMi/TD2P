@@ -661,42 +661,25 @@ function generateDomain(foundTDs) {
 const availableObjects = [];
 const availableInitialValues = [];
 
+const addedInitialValues = [];
+
 function generateObjects(td) {
   // One object representing the Thing
-  availableObjects.push({ name: td.title, type: "Thing", functionName: "" });
-
-  // Generate an object for inputs
-  let cnt = 0;
-  for (const element of availableFunctions) {
-    // Generate Name
-    const name = `input${cnt++}`;
-    // Generate type:
-    let type;
-    for (const elementType of element.types) {
-      if (elementType == "Thing") {
-        continue;
-      }
-      type = elementType;
-    }
-
-    // Check if type is undefined, if so no input
-    if (type == undefined) {
-      cnt--;
-      continue;
-    }
-
-    availableObjects.push({
-      name: name,
-      type: type,
-      functionName: element.name,
-    });
-  }
+  availableObjects.push({
+    name: td.title,
+    type: `Thing${thingID}`,
+  });
 }
 
-async function initValues(thing, initialValues, td) {
+async function initValues(thing, predefinedValues, td) {
   // Get current values of all read properties
   for (const propertyName in td.properties) {
     if (td.properties[propertyName].writeOnly == true) {
+      continue;
+    }
+
+    // check if already added
+    if (addedInitialValues.includes(`${propertyName}${td.title}`)) {
       continue;
     }
 
@@ -708,10 +691,16 @@ async function initValues(thing, initialValues, td) {
       value: value,
       thing: td.title,
     });
+
+    addedInitialValues.push(`${propertyName}${td.title}`);
   }
 
   // For all predicates with suffix _Read: Add init value false
   for (const element of availablePredicates) {
+    // check if already added
+    if (addedInitialValues.includes(`${element.name}${false}`)) {
+      continue;
+    }
     if (element.name.endsWith("_Read")) {
       availableInitialValues.push({
         name: element.name,
@@ -719,14 +708,15 @@ async function initValues(thing, initialValues, td) {
         thing: td.title,
       });
     }
+    addedInitialValues.push(`${element.name}${false}`);
   }
 
   // Analyze initialValues
-  const keys = Object.keys(initialValues);
+  const keys = Object.keys(predefinedValues);
   for (const key of keys) {
     availableInitialValues.push({
       name: key,
-      value: initialValues[key],
+      value: predefinedValues[key],
       thing: td.title,
     });
   }
@@ -734,7 +724,7 @@ async function initValues(thing, initialValues, td) {
 
 function createProblemTemplate(domainName, problemName, goal) {
   let template = `
-  (define (domain ${problemName})
+  (define (problem ${problemName})
   (:domain ${domainName})
   <!--objects-->
   <!--init-->
@@ -743,14 +733,52 @@ function createProblemTemplate(domainName, problemName, goal) {
   )
   )
   `;
+
+  // Add objects
+  let objectString = "(:objects \n";
+  for (const object of availableObjects) {
+    objectString += `${object.name} - ${object.type}\n`;
+  }
+  objectString += ")\n";
+  template = template.replace("<!--objects-->", objectString);
+
+  // Add initial values
+  let initialValuesString = "(:init \n";
+  for (const initValue of availableInitialValues) {
+    // Check type
+    if (typeof initValue.value === "boolean") {
+      if (initValue.value) {
+        initialValuesString += `(${initValue.name} ${initValue.thing})\n`;
+        continue;
+      }
+      initialValuesString += `(not (${initValue.name} ${initValue.thing}))\n`;
+    } else {
+      // type is number
+      initialValuesString += `(= (${initValue.name} ${initValue.thing}) ${initValue.value})\n`;
+    }
+  }
+  initialValuesString += ")\n";
+  template = template.replace("<!--init-->", initialValuesString);
+
+  return template;
 }
 
-async function generateProblem(td, thing, initialValues) {
+async function generateProblem(foundTDs, WoT, predefinedValues) {
   // Generate Objects
-  generateObjects(td);
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i];
+    thingID = i;
+    generateObjects(td);
+  }
   console.log(availableObjects);
 
-  await initValues(thing, initialValues, td);
+  // Get initial values
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i];
+    thingID = i;
+    const thing = await WoT.consume(td);
+    await initValues(thing, predefinedValues, td);
+  }
   console.log(availableInitialValues);
 }
 
@@ -769,8 +797,8 @@ async function main() {
       const initialTD = "http://172.17.187.244:3001/doorTd";
       const domainName = "myDomain";
       const problemName = "myProblem";
-      const goal = "(= (openingSpeedLevel SmartAutomaticDoor) 5)";
-      const initialValues = { openingSpeedLevel: 1 };
+      const goal = "(doorOpenState DoorController)";
+      const predefinedValues = {};
 
       // Get all linked TDs using the crawler
       const foundTDs = Array.from(await crawler.crawl(initialTD));
@@ -778,17 +806,14 @@ async function main() {
       // Extract all Domain information of found TDs
       generateDomain(foundTDs);
 
-      // Consume Thing
-      //const thing = await WoT.consume(td);
-
       // Extract all Problem Information of the TD and the Thing
-      //await generateProblem(td, thing, initialValues);
+      await generateProblem(foundTDs, WoT, predefinedValues);
 
       // Generate one domain and one problem file involving all Things
       const domainFile = createDomainTemplate(domainName);
-      const problemFile = createProblemTemplate(domainName, problemName);
+      const problemFile = createProblemTemplate(domainName, problemName, goal);
 
-      console.log(domainFile);
+      console.log(problemFile);
     })
     .catch((err) => {
       console.error(err);
