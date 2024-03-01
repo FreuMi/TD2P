@@ -1,5 +1,7 @@
 const { Servient, ConsumedThing } = require("@node-wot/core");
 const { HttpClientFactory } = require("@node-wot/binding-http");
+const fs = require("fs");
+
 const crawler = require("./crawler");
 
 let availableObjectTypes = [];
@@ -626,7 +628,8 @@ function generateDomain(foundTDs) {
     thingID = i; // Set Thing ID
     generateObjectTypes(td);
   }
-  console.log("Types:", availableObjectTypes);
+  //console.log("Types:", availableObjectTypes);
+  console.log("Generated Object Types.");
 
   // Generate all predicates
   for (let i = 0; i < foundTDs.length; i++) {
@@ -634,7 +637,8 @@ function generateDomain(foundTDs) {
     thingID = i;
     generatePredicates(td);
   }
-  console.log("Predicates:", availablePredicates);
+  //console.log("Predicates:", availablePredicates);
+  console.log("Generated Predicates.");
 
   // Generate all functions
   for (let i = 0; i < foundTDs.length; i++) {
@@ -642,7 +646,8 @@ function generateDomain(foundTDs) {
     thingID = i;
     generateFunctions(td);
   }
-  console.log("Functions:", availableFunctions);
+  //console.log("Functions:", availableFunctions);
+  console.log("Generated Functions.");
 
   // Generate all actions
   for (let i = 0; i < foundTDs.length; i++) {
@@ -650,7 +655,8 @@ function generateDomain(foundTDs) {
     thingID = i;
     generateActions(td);
   }
-  console.log("Actions", availableActions);
+  //console.log("Actions", availableActions);
+  console.log("Generated Actions.");
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -770,7 +776,8 @@ async function generateProblem(foundTDs, WoT, predefinedValues) {
     thingID = i;
     generateObjects(td);
   }
-  console.log(availableObjects);
+  //console.log(availableObjects);
+  console.log("Generated Objects.");
 
   // Get initial values
   for (let i = 0; i < foundTDs.length; i++) {
@@ -779,13 +786,19 @@ async function generateProblem(foundTDs, WoT, predefinedValues) {
     const thing = await WoT.consume(td);
     await initValues(thing, predefinedValues, td);
   }
-  console.log(availableInitialValues);
+  //console.log(availableInitialValues);
+  console.log("Generated Initial Values.");
 }
 
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////
+function writeFiles(domainFile, problemFile) {
+  fs.writeFileSync("generatedDomain", domainFile);
+  fs.writeFileSync("generatedProblem", problemFile);
+}
+
 async function main() {
   const servient = new Servient();
   servient.addClientFactory(new HttpClientFactory(null));
@@ -813,7 +826,8 @@ async function main() {
       const domainFile = createDomainTemplate(domainName);
       const problemFile = createProblemTemplate(domainName, problemName, goal);
 
-      console.log(problemFile);
+      writeFiles(domainFile, problemFile);
+      console.log("Successfully Completed!");
     })
     .catch((err) => {
       console.error(err);
