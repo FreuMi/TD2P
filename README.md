@@ -5,7 +5,7 @@ This software provides a tool for mapping Thing Descriptions (TDs) to PDDL (Plan
 ## Features
 
 - **Convert Thing Descriptions to PDDL**: Maps TDs to PDDL domain and problem definitions for use in planning algorithms.
-- **Link Following**: Follows links inside TDs ro discover related TDs and create a combined planning problem.
+- **Link Following**: Follows links inside TDs to discover related TDs and create a combined planning problem.
 - **Compatibility with Standard PDDL Solvers**: Designed to work with PDDL 2.1 compliant solvers, broadening the range of applicable planning tools.
 
 ## Installation
