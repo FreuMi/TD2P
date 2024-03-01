@@ -1,10 +1,13 @@
-const { Servient } = require("@node-wot/core");
+const { Servient, ConsumedThing } = require("@node-wot/core");
 const { HttpClientFactory } = require("@node-wot/binding-http");
+const crawler = require("./crawler");
 
 let availableObjectTypes = [];
 let availablePredicates = [];
 let availableFunctions = [];
 let availableActions = [];
+
+let thingID = 0;
 
 function getAllValuesWithKey(obj, key) {
   const result = new Set();
@@ -33,29 +36,173 @@ function getAllValuesWithKey(obj, key) {
 // Define the mapping of operation keys to functions
 const functions = {
   "op:numeric-add": opAdd,
+  "op:numeric-subtract": opSub,
   "op:numeric-multiply": opMul,
+  "op:numeric-equal": numEqual,
+  "op:boolean-equal": boolEqual,
 };
 
-function opAdd(element1, element2) {
-  // Get type of element 1
-  let typesElement1 = "";
-  let values = getData(element1);
-  for (const element of values[0].variables) {
-    typesElement1 += ` ${element}`;
+function opSub(element1, element2) {
+  // Check if elmenent is number; then use abs
+  if (typeof element1 === "number") {
+    element1 = Math.abs(element1);
+  } else if (typeof element2 === "number") {
+    element2 = Math.abs(element2);
   }
+
+  // Generate String
+  let resultString = "(- ";
+
+  // Check if element1 is a number
+  if (typeof element1 === "number") {
+    resultString += `${element1} `;
+  } else {
+    // Get type of element 1
+    let typesElement1 = "";
+    let values = getData(element1);
+    if (values[0]?.variables) {
+      for (const element of values[0]?.variables) {
+        typesElement1 += ` ${element}`;
+      }
+    }
+    resultString += `(${element1}${typesElement1}) `;
+  }
+
   // Get type of element 2
-  let typesElement2 = "";
-  values = getData(element2);
-  for (const element of values[0].variables) {
-    typesElement2 += ` ${element}`;
+  if (typeof element2 === "number") {
+    resultString += `${element2} `;
+  } else {
+    // Get type of element 1
+    let typesElement2 = "";
+    values = getData(element2);
+    if (values[0]?.variables) {
+      for (const element of values[0]?.variables) {
+        typesElement2 += ` ${element}`;
+      }
+    }
+    resultString += `(${element2}${typesElement2}) `;
   }
-  return `(+ (${element1} ${typesElement1}) (${element2} ${typesElement2}))`;
+  resultString += ")";
+  return resultString;
+}
+
+function opAdd(element1, element2) {
+  // Check if any element is negative
+  if (Math.sign(element1) == -1 || Math.sign(element2) == -1) {
+    // call subtract method
+    return opSub(element1, element2);
+  }
+
+  // Generate String
+  let resultString = "(+ ";
+
+  // Check if element1 is a number
+  if (typeof element1 === "number") {
+    resultString += `${element1} `;
+  } else {
+    // Get type of element 1
+    let typesElement1 = "";
+    let values = getData(element1);
+    if (values[0]?.variables) {
+      for (const element of values[0]?.variables) {
+        typesElement1 += ` ${element}`;
+      }
+    }
+    resultString += `(${element1}${typesElement1}) `;
+  }
+
+  // Get type of element 2
+  if (typeof element2 === "number") {
+    resultString += `${element2} `;
+  } else {
+    // Get type of element 1
+    let typesElement2 = "";
+    values = getData(element2);
+    if (values[0]?.variables) {
+      for (const element of values[0]?.variables) {
+        typesElement2 += ` ${element}`;
+      }
+    }
+    resultString += `(${element2}${typesElement2}) `;
+  }
+  resultString += ")";
+  return resultString;
 }
 
 function opMul(element1, element2) {
   return `(* (${element1} ${generatedFunctions.get(
     element1
   )}) (${element2} ${generatedFunctions.get(element2)}))`;
+}
+
+function numEqual(element1, element2) {
+  let valueElement1 = getData(element1)[0];
+  let valueElement2 = getData(element2)[0];
+
+  // Generate return string
+  let returnString = "(= ";
+  if (typeof element1 === "number") {
+    // No types; no braces
+    returnString += ` ${element1}`;
+  } else {
+    returnString += `(${element1}`;
+    // Add all variables for first element
+    if (valueElement1 != undefined) {
+      for (const element of valueElement1.variables) {
+        returnString += ` ${element}`;
+      }
+    }
+    returnString += ")";
+  }
+
+  // Check if element2 is number
+  if (typeof element2 === "number") {
+    // No types; no braces
+    returnString += ` ${element2}`;
+  } else {
+    returnString += ` (${element2}`;
+    // Add all variables for second element
+    if (valueElement2 != undefined) {
+      for (const element of valueElement2.variables) {
+        returnString += ` ${element}`;
+      }
+    }
+    returnString += ")";
+  }
+
+  returnString += ")";
+
+  return returnString;
+}
+
+function boolEqual(element1, element2) {
+  if (typeof element1 == "boolean") {
+    let valueElement2 = getData(element2)[0];
+    // Generate result string
+    let resultString = `${element2}`;
+    if (valueElement2 != undefined) {
+      for (const element of valueElement2.variables) {
+        resultString += ` ${element}`;
+      }
+    }
+    if (element1) {
+      return `(${resultString})`;
+    }
+    return `(not(${resultString}))`;
+  }
+
+  let valueElement1 = getData(element1)[0];
+  // Generate result string
+  let resultString = `${element1}`;
+  if (valueElement1 != undefined) {
+    for (const element of valueElement1.variables) {
+      resultString += ` ${element}`;
+    }
+  }
+  if (element2) {
+    return `(${resultString})`;
+  }
+  return `(not(${resultString}))`;
 }
 
 function parse(node) {
@@ -84,6 +231,34 @@ function parse(node) {
   return node;
 }
 
+function parseCondition(node) {
+  if (typeof node == "object") {
+    if (node["@id"]) {
+      // Directly return the identifier if the object is an @id reference
+      return node["@id"];
+    }
+
+    const key = Object.keys(node)[0];
+    if (key === "and") {
+      // Process all elements in the array for "and"
+      // and wrap them with "and" prefix
+      return `(and ${node[key].map(parse).join(" ")})`;
+    }
+    if (functions[key]) {
+      // Process recognized operations with their corresponding functions
+      return functions[key](...node[key].map(parse));
+    }
+  }
+  // Handle basic types
+  if (Array.isArray(node)) {
+    return node.map(parse).join(", ");
+  }
+  if (Number.isInteger(node) || typeof node == "boolean") {
+    return node;
+  }
+  return "";
+}
+
 // Currently only handels one
 function evalEffect(statements) {
   const statement = statements[0];
@@ -93,7 +268,9 @@ function evalEffect(statements) {
 
   // If only boolean handle it
   if (typeof assignValue == "boolean") {
-    return assignValue ? `${identifier} ?thing` : `not(${identifier} ?thing)`;
+    return assignValue
+      ? `${identifier} ?thing${thingID}`
+      : `not(${identifier} ?thing${thingID})`;
   }
   // Else handle more complex parsing
   const resultAssign = parse(assignValue);
@@ -137,35 +314,15 @@ function getData(name) {
 }
 
 function evalCondition(statement) {
-  if (statement == undefined) {
+  if (statement == undefined || Object.keys(statement).length == 0) {
     // undefined means not found -> empty
     return "";
   }
+  const value = parseCondition(statement);
+  // Remove braces for easier formatting
+  const x = value.substring(1, value.length - 1);
 
-  // Extract operation and operands
-  const operation = Object.keys(statement)[0];
-  const operands = statement[operation];
-
-  let identifier, booleanValue;
-  for (const operand of operands) {
-    if (typeof operand === "object" && "@id" in operand) {
-      identifier = operand["@id"];
-    } else if (typeof operand === "boolean") {
-      booleanValue = operand;
-    }
-  }
-
-  // Map based on the operation
-  switch (operation) {
-    case "op:booleanEqual":
-      // Translate to the identifier or its negation
-      return booleanValue
-        ? `${identifier} ?thing`
-        : `not(${identifier} ?thing)`;
-    default:
-      // Handle other operations or throw an error
-      throw new Error(`Unsupported operation: ${operation}`);
-  }
+  return x;
 }
 
 function generateActions(td) {
@@ -181,11 +338,11 @@ function generateActions(td) {
     }
 
     // For read properties parameters is always Thing object
-    const parameters = "?thing - Thing";
+    const parameters = `?thing${thingID} - Thing${thingID}`;
     const preCondition = evalCondition(td.properties[property].preCondition);
     // Effect for read properties is always that @id_Read is set to true
     const id = td.properties[property]["@id"];
-    const effect = `${id}_Read ?thing`;
+    const effect = `${id}_Read ?thing${thingID}`;
 
     availableActions.push({
       name: `readProperty_${property}`,
@@ -198,42 +355,8 @@ function generateActions(td) {
   ///////////////////////////////////////////////
   // Generate PDDL actions for writeProperties //
   ///////////////////////////////////////////////
-  for (const property in td.properties) {
-    if (
-      td.properties[property].readOnly == true ||
-      td.properties[property].readOnly == undefined
-    ) {
-      continue;
-    }
 
-    // Handle integer //
-    if (td.properties[property].type == "integer") {
-      const id = td.properties[property]["@id"];
-      // Parameters are input value + Thing
-      const values = getData(`${id}_input`)[0];
-      let parameters = "";
-      for (let i = 0; i < values.types.length; i++) {
-        parameters += ` ${values.variables[i]} - ${values.types[i]}`;
-      }
-      const preCondition = evalCondition(td.properties[property].preCondition);
-      // Effect for write properties is always an value assignment of the input to the property
-      let effect = `assign (${id} ?thing)(${id}_input`;
-      for (const element of values.variables) {
-        // Add variables
-        effect += ` ${element}`;
-      }
-      effect += ")";
-
-      availableActions.push({
-        name: `writeProperty_${property}`,
-        params: parameters,
-        pre: preCondition,
-        effect: effect,
-      });
-    }
-
-    // TODO: Float/Number
-  }
+  // TODO: Integer/Float
 
   /////////////////////////////////////
   // Generate Actions with no input //
@@ -245,6 +368,7 @@ function generateActions(td) {
     // Get variables and types
     const ids = getAllValuesWithKey(td.actions[action], "@id");
     let parameters = "";
+
     for (const element of ids) {
       const values = getData(element)[0];
       for (let i = 0; i < values.types.length; i++) {
@@ -277,7 +401,7 @@ function generateActions(td) {
       continue;
     }
 
-    // Cover all other references @id than input
+    // Cover all other references @id then input
     const ids = getAllValuesWithKey(td.actions[action], "@id");
     let parameters = "";
     const added = []; // Keep track of added data
@@ -295,33 +419,46 @@ function generateActions(td) {
       }
     }
 
-    // One parameter for the input
-    const id = td.actions[action].input["@id"];
-    // Parameters are input value + Thing
-    const values = getData(`${id}`)[0];
-    for (let i = 0; i < values.types.length; i++) {
-      if (!added.includes(values.variables[i])) {
-        parameters += ` ${values.variables[i]} - ${values.types[i]}`;
-      }
-    }
-
     // Assume: Only one post condition
-    const targetID = td.actions[action].effect[0].to["@id"];
-    const preCondition = evalCondition(td.actions[action].preCondition);
-    const effect = evalEffect(td.actions[action].effect);
+    const max = td.actions[action].input.maximum;
+    const min = td.actions[action].input.minimum;
+    const inputVariable = td.actions[action].input["@id"];
 
-    availableActions.push({
-      name: `invokeAction_${action}`,
-      params: parameters,
-      pre: preCondition,
-      effect: effect,
-    });
+    for (let j = min; j <= max; j++) {
+      const preCondition = evalCondition(td.actions[action].preCondition);
+      // Create a deep copy of effectInput to ensure modifications are isolated to each iteration
+      let effectInput = JSON.parse(
+        JSON.stringify(td.actions[action].effect[0])
+      );
+
+      for (let key in effectInput.assign) {
+        // Check if the property is an array
+        if (Array.isArray(effectInput.assign[key])) {
+          // Find the index of the object with "@id": inputVariable
+          const index = effectInput.assign[key].findIndex(
+            (element) => element["@id"] === inputVariable
+          );
+          // Check if the index was found
+          if (index !== -1) {
+            effectInput.assign[key][index] = j;
+            break;
+          }
+        }
+      }
+
+      const effect = evalEffect([effectInput]);
+
+      availableActions.push({
+        name: `invokeAction_${action}_${j}`,
+        params: parameters,
+        pre: preCondition,
+        effect: effect,
+      });
+    }
   }
 }
 
 function generateFunctions(td) {
-  let counterInputValues = 0;
-
   ///////////////////////////////
   /// MODEL VALUE OF PROPERTY ///
   ///////////////////////////////
@@ -336,8 +473,8 @@ function generateFunctions(td) {
 
     const id = td.properties[property]["@id"];
     const name = id;
-    const propertyType = ["Thing"];
-    const propertyTypeVariable = ["?thing"];
+    const propertyType = [`Thing${thingID}`];
+    const propertyTypeVariable = [`?thing${thingID}`];
 
     // Add data with name, types, and variable names
     availableFunctions.push({
@@ -348,54 +485,6 @@ function generateFunctions(td) {
   }
 
   // TODO: Float
-
-  ///////////////////////////////
-  /// MODEL INPUT OF PROPERTY ///
-  ///////////////////////////////
-
-  // Add function for write properties with input values of type integer
-  // Name == @id
-  for (const property in td.properties) {
-    if (
-      td.properties[property].type != "integer" ||
-      td.properties[property].writeOnly != true
-    ) {
-      continue;
-    }
-
-    const id = td.properties[property]["@id"];
-    const name = `${id}_input`;
-    const propertyType = ["Thing", "integer"];
-    const propertyTypeVariable = ["?thing", `?v${counterInputValues++}`];
-
-    availableFunctions.push({
-      name: name,
-      types: propertyType,
-      variables: propertyTypeVariable,
-    });
-  }
-
-  // Add function for actions with input values of type integer
-  // Name == "input.@id"
-  for (const action in td.actions) {
-    if (td.actions[action]?.input?.type != "integer") {
-      continue;
-    }
-
-    const id = td.actions[action].input["@id"];
-    const name = `${id}`;
-    const propertyType = ["Thing", "integer"];
-    const propertyTypeVariable = ["?thing", `?v${counterInputValues++}`];
-
-    // Add data with name, types, and variable names
-    availableFunctions.push({
-      name: name,
-      types: propertyType,
-      variables: propertyTypeVariable,
-    });
-  }
-
-  // TODO: Floats
 }
 
 function generatePredicates(td) {
@@ -414,8 +503,8 @@ function generatePredicates(td) {
 
     const id = td.properties[property]["@id"];
     const name = `${id}_Read`;
-    const propertyType = ["Thing"];
-    const propertyTypeVariable = ["?thing"];
+    const propertyType = [`Thing${thingID}`];
+    const propertyTypeVariable = [`?thing${thingID}`];
 
     // Add data with name, types, and variable names
     availablePredicates.push({
@@ -434,8 +523,8 @@ function generatePredicates(td) {
     }
 
     const name = td.properties[property]["@id"];
-    const propertyType = ["Thing"];
-    const propertyTypeVariable = ["?thing"];
+    const propertyType = [`Thing${thingID}`];
+    const propertyTypeVariable = [`?thing${thingID}`];
 
     // Add data with name, types, and variable names
     availablePredicates.push({
@@ -452,29 +541,12 @@ function generateObjectTypes(td) {
   const generatedObjectTypes = new Set();
 
   // one object type is always "Thing"
-  generatedObjectTypes.add("Thing");
-
-  // an other object type is "integer" and "float"
-  // only available if there is an affordance of type integer or number
-  for (const property in td.properties) {
-    if (td.properties[property].type == "integer") {
-      generatedObjectTypes.add("integer");
-    }
-    if (td.properties[property].type == "number") {
-      generatedObjectTypes.add("float");
-    }
-  }
-  for (const action in td.actions) {
-    if (td.actions[action].type == "integer") {
-      generatedObjectTypes.add("integer");
-    }
-    if (td.actions[action].type == "number") {
-      generatedObjectTypes.add("float");
-    }
-  }
+  generatedObjectTypes.add(`Thing${thingID}`);
 
   // convert set to array
-  availableObjectTypes = Array.from(generatedObjectTypes);
+  availableObjectTypes = availableObjectTypes.concat(
+    Array.from(generatedObjectTypes)
+  );
 }
 
 function createDomainTemplate(domainName) {
@@ -540,30 +612,45 @@ function createDomainTemplate(domainName) {
   // Generate Actions
   let actionString = "";
   for (const action of availableActions) {
-    actionString += `(:action ${action.name}\n:parameters(${action.params})\n:precondition(${action.pre})\n:effect(${action.effect}))\n`;
+    actionString += `(:action ${action.name}\n:parameters(${action.params})\n:precondition(${action.pre})\n:effect(${action.effect})\n)\n`;
   }
   template = template.replace("<!--actions-->", actionString);
 
   return template;
 }
 
-function generateDomain(td, domainName) {
-  // Generate Object Types
-  generateObjectTypes(td);
+function generateDomain(foundTDs) {
+  // Generate all object Types
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i]; // Get TD
+    thingID = i; // Set Thing ID
+    generateObjectTypes(td);
+  }
   console.log("Types:", availableObjectTypes);
 
-  generatePredicates(td);
+  // Generate all predicates
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i];
+    thingID = i;
+    generatePredicates(td);
+  }
   console.log("Predicates:", availablePredicates);
 
-  generateFunctions(td);
+  // Generate all functions
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i];
+    thingID = i;
+    generateFunctions(td);
+  }
   console.log("Functions:", availableFunctions);
 
-  generateActions(td);
+  // Generate all actions
+  for (let i = 0; i < foundTDs.length; i++) {
+    const td = foundTDs[i];
+    thingID = i;
+    generateActions(td);
+  }
   console.log("Actions", availableActions);
-
-  const domain = createDomainTemplate(domainName);
-  console.log(domain);
-  return domain;
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -645,25 +732,20 @@ async function initValues(thing, initialValues, td) {
   }
 }
 
-async function generateProblem(
-  td,
-  domainName,
-  problemName,
-  goal,
-  thing,
-  initialValues
-) {
+function createProblemTemplate(domainName, problemName, goal) {
   let template = `
-    (define (domain ${problemName})
-    (:domain ${domainName})
-    <!--objects-->
-    <!--init-->
-    (:goal
-      ${goal}
-    )
-    )
-    `;
+  (define (domain ${problemName})
+  (:domain ${domainName})
+  <!--objects-->
+  <!--init-->
+  (:goal
+    ${goal}
+  )
+  )
+  `;
+}
 
+async function generateProblem(td, thing, initialValues) {
   // Generate Objects
   generateObjects(td);
   console.log(availableObjects);
@@ -683,26 +765,30 @@ async function main() {
   servient
     .start()
     .then(async (WoT) => {
-      // Init
-      const tdAddr = "http://172.23.220.91:3001/";
+      // Initial Config Values
+      const initialTD = "http://172.17.187.244:3001/doorTd";
       const domainName = "myDomain";
       const problemName = "myProblem";
-      const goal = "(= (brighnessState SmartLightBulb) 15)";
-      const initialValues = { brightnessState: 0 };
+      const goal = "(= (openingSpeedLevel SmartAutomaticDoor) 5)";
+      const initialValues = { openingSpeedLevel: 1 };
 
-      // Get Thing Desccription
-      const td = await WoT.requestThingDescription(tdAddr);
-      const thing = await WoT.consume(td);
+      // Get all linked TDs using the crawler
+      const foundTDs = Array.from(await crawler.crawl(initialTD));
 
-      const pddlDomain = generateDomain(td, domainName);
-      const pddlProblem = await generateProblem(
-        td,
-        domainName,
-        problemName,
-        goal,
-        thing,
-        initialValues
-      );
+      // Extract all Domain information of found TDs
+      generateDomain(foundTDs);
+
+      // Consume Thing
+      //const thing = await WoT.consume(td);
+
+      // Extract all Problem Information of the TD and the Thing
+      //await generateProblem(td, thing, initialValues);
+
+      // Generate one domain and one problem file involving all Things
+      const domainFile = createDomainTemplate(domainName);
+      const problemFile = createProblemTemplate(domainName, problemName);
+
+      console.log(domainFile);
     })
     .catch((err) => {
       console.error(err);
