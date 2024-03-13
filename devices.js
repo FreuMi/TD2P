@@ -12,12 +12,24 @@ app.use(bodyParser.text());
 let openState = false;
 
 app.get("/doorTd", (req, res) => {
-  const IP = "172.17.187.244:3001";
+  const IP = "localhost:3001";
 
   const td = {
     "@context": [
       "https://www.w3.org/2022/wot/td/v1.1",
-      { "@base": `http://${IP}/` },
+      {
+        "@base": `http://${IP}/`,
+        and: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#logicalAndParameter",
+        booleanEqual:
+          "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#booleanEqualParameter",
+        numericEqual:
+          "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#numericEqualParameter",
+        to: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasTarget",
+        assign: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasAssignment",
+        effect: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasEffect",
+        precondition:
+          "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasPrecondition",
+      },
     ],
     id: "urn:uuid:0804d572-cce8-422a-bb7c-4412fcd56f06",
     title: "DoorController",
@@ -29,7 +41,7 @@ app.get("/doorTd", (req, res) => {
     security: "nosec_sc",
     links: [
       {
-        href: "http://172.17.187.244:3001/powerSupplyTd",
+        href: `http://${IP}/powerSupplyTd`,
         type: "application/td+json",
       },
     ],
@@ -45,20 +57,20 @@ app.get("/doorTd", (req, res) => {
     actions: {
       open: {
         forms: [{ href: `http://${IP}/open` }],
-        preCondition: {
+        precondition: {
           and: [
-            { "op:numeric-equal": [{ "@id": `outputVoltage` }, 5] },
-            { "op:boolean-equal": [{ "@id": "doorOpenState" }, false] },
+            { numericEqual: [{ "@id": `outputVoltage` }, 5] },
+            { booleanEqual: [{ "@id": "doorOpenState" }, false] },
           ],
         },
         effect: [{ assign: true, to: { "@id": "doorOpenState" } }],
       },
       close: {
         forms: [{ href: `http://${IP}/close` }],
-        preCondition: {
+        precondition: {
           and: [
-            { "op:numeric-equal": [{ "@id": `outputVoltage` }, 5] },
-            { "op:boolean-equal": [{ "@id": "doorOpenState" }, true] },
+            { numericEqual: [{ "@id": `outputVoltage` }, 5] },
+            { booleanEqual: [{ "@id": "doorOpenState" }, true] },
           ],
         },
         effect: [{ assign: false, to: { "@id": "doorOpenState" } }],
@@ -94,12 +106,21 @@ app.post("/close", function (req, res) {
 const outputVoltage = 0;
 
 app.get("/powerSupplyTd", (req, res) => {
-  const IP = "172.17.187.244:3001";
+  const IP = "localhost:3001";
 
   const td = {
     "@context": [
       "https://www.w3.org/2022/wot/td/v1.1",
-      { "@base": `http://${IP}/` },
+      {
+        "@base": `http://${IP}/`,
+        to: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasTarget",
+        assign: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasAssignment",
+        effect: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasEffect",
+        numericAdd:
+          "shttps://paul.ti.rw.fau.de/~jo00defe/voc/spa#numericAddParameter",
+        precondition:
+          "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasPrecondition",
+      },
     ],
     id: "urn:uuid:0804d572-cce8-422a-bb7c-4412fcd56f06",
     title: "PowerSupply",
@@ -127,11 +148,11 @@ app.get("/powerSupplyTd", (req, res) => {
           maximum: 10,
         },
         forms: [{ href: `http://${IP}/changeVoltageValue` }],
-        preCondition: {},
+        precondition: {},
         effect: [
           {
             assign: {
-              "op:numeric-add": [
+              numericAdd: [
                 { "@id": `outputVoltage` },
                 { "@id": "changeVoltageInput" },
               ],
