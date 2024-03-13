@@ -103,7 +103,7 @@ app.post("/close", function (req, res) {
 ////// TD2 ///////
 /////////////////
 
-const outputVoltage = 0;
+let outputVoltage = 0;
 
 app.get("/powerSupplyTd", (req, res) => {
   const IP = "localhost:3001";
@@ -176,12 +176,21 @@ app.get("/outputVoltage", function (req, res) {
   res.send(outputVoltage.toString());
 });
 
-app.post("/changeVoltageValue", function (req, res) {
-  console.log("Action: changeVoltageByValue invoked of power supply");
-  valueToIncrease = parseInt(req.body);
-  outputVoltage = outputVoltage + valueToIncrease;
-  res.sendStatus(200);
-});
+app.post(
+  "/changeVoltageValue",
+  bodyParser.raw({ type: "application/json" }),
+  function (req, res) {
+    valueToIncrease = parseInt(req.body);
+    outputVoltage = outputVoltage + valueToIncrease;
+    console.log(
+      "Action: changeVoltageByValue invoked of power supply input:",
+      valueToIncrease,
+      "| New voltage = ",
+      outputVoltage
+    );
+    res.sendStatus(200);
+  }
+);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
