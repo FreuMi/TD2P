@@ -3,6 +3,7 @@ const { HttpClientFactory } = require("@node-wot/binding-http");
 const fs = require("fs");
 
 const crawler = require("./crawler");
+const parser = require("./outputparser");
 
 let availableObjectTypes = [];
 let availablePredicates = [];
@@ -37,11 +38,11 @@ function getAllValuesWithKey(obj, key) {
 
 // Define the mapping of operation keys to functions
 const functions = {
-  "op:numeric-add": opAdd,
-  "op:numeric-subtract": opSub,
-  "op:numeric-multiply": opMul,
-  "op:numeric-equal": numEqual,
-  "op:boolean-equal": boolEqual,
+  numericAdd: opAdd,
+  numericSubtract: opSub,
+  numericMultiply: opMul,
+  numericEqual: numEqual,
+  booleanEqual: boolEqual,
 };
 
 function opSub(element1, element2) {
@@ -341,7 +342,7 @@ function generateActions(td) {
 
     // For read properties parameters is always Thing object
     const parameters = `?thing${thingID} - Thing${thingID}`;
-    const preCondition = evalCondition(td.properties[property].preCondition);
+    const precondition = evalCondition(td.properties[property].precondition);
     // Effect for read properties is always that @id_Read is set to true
     const id = td.properties[property]["@id"];
     const effect = `${id}_Read ?thing${thingID}`;
@@ -349,7 +350,7 @@ function generateActions(td) {
     availableActions.push({
       name: `readProperty_${property}`,
       params: parameters,
-      pre: preCondition,
+      pre: precondition,
       effect: effect,
     });
   }
@@ -379,14 +380,14 @@ function generateActions(td) {
     }
 
     // Eval given preconditon
-    const preCondition = evalCondition(td.actions[action].preCondition);
+    const precondition = evalCondition(td.actions[action].precondition);
     // Eval given effect
     const effect = evalEffect(td.actions[action].effect);
 
     availableActions.push({
       name: `invokeAction_${action}`,
       params: parameters,
-      pre: preCondition,
+      pre: precondition,
       effect: effect,
     });
   }
@@ -427,7 +428,7 @@ function generateActions(td) {
     const inputVariable = td.actions[action].input["@id"];
 
     for (let j = min; j <= max; j++) {
-      const preCondition = evalCondition(td.actions[action].preCondition);
+      const precondition = evalCondition(td.actions[action].precondition);
       // Create a deep copy of effectInput to ensure modifications are isolated to each iteration
       let effectInput = JSON.parse(
         JSON.stringify(td.actions[action].effect[0])
@@ -453,7 +454,7 @@ function generateActions(td) {
       availableActions.push({
         name: `invokeAction_${action}_${j}`,
         params: parameters,
-        pre: preCondition,
+        pre: precondition,
         effect: effect,
       });
     }
@@ -807,7 +808,7 @@ async function main() {
     .start()
     .then(async (WoT) => {
       // Initial Config Values
-      const initialTD = "http://172.17.187.244:3001/doorTd";
+      const initialTD = "http://localhost:3001/doorTd";
       const domainName = "myDomain";
       const problemName = "myProblem";
       const goal = "(doorOpenState DoorController)";
@@ -827,6 +828,19 @@ async function main() {
       const problemFile = createProblemTemplate(domainName, problemName, goal);
 
       writeFiles(domainFile, problemFile);
+
+      // Check if ENHSP planner is available
+      if (fs.existsSync("./nbdist/enhsp-19.jar")) {
+        console.log("PDDL planner found.");
+        const wotProgram = await parser.executePlanner(foundTDs);
+
+        // Write to file
+        fs.writeFileSync("wotProgram.js", wotProgram);
+        console.log("WoT Program generated.");
+      } else {
+        console.log("No PDDL planner found, skip planning step.");
+      }
+
       console.log("Successfully Completed!");
     })
     .catch((err) => {
