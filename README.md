@@ -43,5 +43,12 @@ node mapper.js
 ```
 3. Use the generated PDDL files with a PDDL solver of your choice. The example has been tested with the [ENHSP-19](https://sites.google.com/view/enhsp/) planner. If all files related to the ENHSP-19 planner are in ```./nbdist/``` and the ```enhsp-19.jar``` can be located, the output is parsed and translated into a WoT program.
 
+## Demo 
+
+
+https://github.com/FreuMi/TD2P/assets/91477109/35207d0f-dd48-4aea-8db4-02cc4ea46d8c
+
+
+
 ## Contributing
 Contributions to improve the Thing Description to PDDL Mapper are welcome. Please feel free to submit pull requests or open issues to discuss potential improvements or report bugs.
