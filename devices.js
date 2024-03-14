@@ -1,5 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const process = require("process");
 const app = express();
 const port = 3001;
 
@@ -69,7 +70,7 @@ app.get("/doorTd", (req, res) => {
         forms: [{ href: `http://${IP}/close` }],
         precondition: {
           and: [
-            { numericEqual: [{ "@id": `outputVoltage` }, 5] },
+            { numericEqual: [{ "@id": `outputVoltage` }, -5] },
             { booleanEqual: [{ "@id": "doorOpenState" }, true] },
           ],
         },
@@ -83,19 +84,19 @@ app.get("/doorTd", (req, res) => {
 });
 
 app.get("/openState", function (req, res) {
-  console.log("Read /openState state of door");
+  console.log("Read 'openState' state of door");
   res.send(openState);
 });
 
 app.post("/open", function (req, res) {
-  console.log("Action: open invoked of door");
   openState = true;
+  console.log("Action: 'open' invoked of door | New openState:", openState);
   res.sendStatus(200);
 });
 
 app.post("/close", function (req, res) {
-  console.log("Action: close invoked of door");
   openState = false;
+  console.log("Action: 'close' invoked of door | New openState:", openState);
   res.sendStatus(200);
 });
 
@@ -117,7 +118,7 @@ app.get("/powerSupplyTd", (req, res) => {
         assign: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasAssignment",
         effect: "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasEffect",
         numericAdd:
-          "shttps://paul.ti.rw.fau.de/~jo00defe/voc/spa#numericAddParameter",
+          "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#numericAddParameter",
         precondition:
           "https://paul.ti.rw.fau.de/~jo00defe/voc/spa#hasPrecondition",
       },
@@ -171,7 +172,7 @@ app.get("/powerSupplyTd", (req, res) => {
 });
 
 app.get("/outputVoltage", function (req, res) {
-  console.log("Read /outputVoltage state of power supply");
+  console.log("Read 'outputVoltage' state of power supply");
   res.setHeader("content-type", "application/json");
   res.send(outputVoltage.toString());
 });
@@ -183,7 +184,7 @@ app.post(
     valueToIncrease = parseInt(req.body);
     outputVoltage = outputVoltage + valueToIncrease;
     console.log(
-      "Action: changeVoltageByValue invoked of power supply input:",
+      "Action: 'changeVoltageByValue' invoked of power supply input:",
       valueToIncrease,
       "| New voltage = ",
       outputVoltage
@@ -193,5 +194,5 @@ app.post(
 );
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`Devices ready at port ${port}`);
 });
