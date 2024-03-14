@@ -1,6 +1,6 @@
 # Thing Description to PDDL Mapper (TD2P)
 
-This software provides a tool for mapping Thing Descriptions (TDs) to PDDL (Planning Domain Definition Language) domain and problem definitions. It is designed for compatibility with standard PDDL 2.1 compliant problem solvers. By using the SPA ontology for annotating TDs with preconditions and effects, users can seamlessly convert their device descriptions into a format that is readily usable with a variety of planning and problem-solving frameworks.
+This software provides a tool for mapping Thing Descriptions (TDs) to PDDL (Planning Domain Definition Language) domain and problem definitions. It is designed for compatibility with standard PDDL 2.1 compliant problem solvers. By using the [spa ontology](https://paul.ti.rw.fau.de/~jo00defe/voc/spa) for annotating TDs with preconditions and effects, users can seamlessly convert their device descriptions into a format that is readily usable with a variety of planning and problem-solving frameworks.
 
 ## Features
 
