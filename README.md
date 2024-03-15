@@ -23,7 +23,7 @@ This software provides a tool for mapping Thing Descriptions (TDs) to PDDL (Plan
 To start the mapping process, adjust the IP of the initial Thing Description and run the mapper script with Node.js:
 
 ```bash
-node mapper.js
+node TD2P_processor.js
 ```
 
 ## Example Scenario
